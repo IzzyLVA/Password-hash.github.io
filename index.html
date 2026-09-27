@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Password Hashing Demo</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f0f13;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      gap: 40px;
+      flex-wrap: wrap;
+    }
+
+    .card {
+      background: #1a1a22;
+      border: 1px solid #2a2a35;
+      border-radius: 12px;
+      padding: 32px;
+      width: 340px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+
+    .subtitle {
+      font-size: 0.85rem;
+      color: #888;
+      margin-bottom: 28px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.8rem;
+      color: #aaa;
+      margin-bottom: 6px;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px 14px;
+      background: #0f0f13;
+      border: 1px solid #333;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 1rem;
+      margin-bottom: 18px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus {
+      border-color: #5b8def;
+    }
+
+    input[readonly] {
+      color: #888;
+      cursor: not-allowed;
+    }
+
+    button {
+      width: 100%;
+      padding: 13px;
+      background: #5b8def;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #4a7bd4;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    /* Process panel */
+    .process {
+      background: #121218;
+      border: 1px solid #2a2a35;
+      border-radius: 12px;
+      padding: 24px;
+      width: 420px;
+      max-width: 100%;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.85rem;
+      line-height: 1.55;
+    }
+
+    .process h2 {
+      font-size: 0.95rem;
+      color: #aaa;
+      margin-bottom: 16px;
+      font-family: system-ui, sans-serif;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .step {
+      margin-bottom: 14px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid #222;
+    }
+
+    .step:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .label {
+      color: #666;
+      font-size: 0.75rem;
+      margin-bottom: 3px;
+    }
+
+    .value {
+      word-break: break-all;
+      color: #cdd6f4;
+    }
+
+    .match {
+      color: #a6e3a1;
+      font-weight: 600;
+    }
+
+    .nomatch {
+      color: #f38ba8;
+      font-weight: 600;
+    }
+
+    .hint {
+      margin-top: 20px;
+      font-size: 0.8rem;
+      color: #666;
+      font-family: system-ui, sans-serif;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Login Card -->
+  <div class="card">
+    <h1>Secure Login Demo</h1>
+    <p class="subtitle">Password is never stored in plain text</p>
+
+    <label>Username</label>
+    <input type="text" value="admin" readonly>
+
+    <label>Password</label>
+    <input type="password" id="password" placeholder="Enter password..." autocomplete="off">
+
+    <button id="loginBtn">Login</button>
+  </div>
+
+  <!-- Background Process Panel -->
+  <div class="process">
+    <h2>Background Process</h2>
+
+    <div class="step">
+      <div class="label">1. Raw password input</div>
+      <div class="value" id="raw">—</div>
+    </div>
+
+    <div class="step">
+      <div class="label">2. SHA-256 hash of input</div>
+      <div class="value" id="inputHash">—</div>
+    </div>
+
+    <div class="step">
+      <div class="label">3. Stored hash (correct password)</div>
+      <div class="value" id="storedHash">—</div>
+    </div>
+
+    <div class="step">
+      <div class="label">4. Comparison result</div>
+      <div class="value" id="result">—</div>
+    </div>
+
+    <p class="hint">
+      Correct password for this demo: <strong>secret123</strong><br>
+      In real systems we also use a unique salt + slow hashing (bcrypt / Argon2).
+    </p>
+  </div>
+
+  <script>
+    // === Pre-computed SHA-256 of the correct password "secret123" ===
+    // (This is what would be stored in a real database)
+    const STORED_HASH = "e5e9fa1ba31ecd1ae84f75caaa474f3a663f05f4"; // placeholder – we compute real one below
+
+    async function sha256(message) {
+      const msgBuffer = new TextEncoder().encode(message);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    // Compute the real stored hash once on load
+    let correctHash = "";
+    sha256("secret123").then(hash => {
+      correctHash = hash;
+      document.getElementById('storedHash').textContent = hash;
+    });
+
+    const passwordInput = document.getElementById('password');
+    const loginBtn = document.getElementById('loginBtn');
+
+    async function runDemo() {
+      const password = passwordInput.value;
+
+      // Step 1
+      document.getElementById('raw').textContent = password || "(empty)";
+
+      if (!password) {
+        document.getElementById('inputHash').textContent = "—";
+        document.getElementById('result').innerHTML = "—";
+        return;
+      }
+
+      // Step 2 – hash the user input
+      const inputHash = await sha256(password);
+      document.getElementById('inputHash').textContent = inputHash;
+
+      // Step 4 – compare
+      const isMatch = inputHash === correctHash;
+      document.getElementById('result').innerHTML = isMatch
+        ? '<span class="match">✓ HASHES MATCH → Login successful</span>'
+        : '<span class="nomatch">✗ HASHES DO NOT MATCH → Access denied</span>';
+    }
+
+    // Live update while typing
+    passwordInput.addEventListener('input', runDemo);
+
+    // Also on button click
+    loginBtn.addEventListener('click', runDemo);
+
+    // Initial state
+    runDemo();
+  </script>
+</body>
+</html>
